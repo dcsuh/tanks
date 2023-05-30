@@ -1,0 +1,392 @@
+---
+title: "tanks"
+author: "Daniel Suh"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+packages
+```{r, message = F}
+library(tidyverse)
+library(magrittr)
+library(here)
+library(ggnewscale)
+library(lubridate)
+library(epitools)
+library(pracma)
+```
+
+read data
+```{r, message = F}
+meta <- read_csv(here("raw_data/tank_metadata.csv"))
+counts <- read_csv(here("raw_data/tank_counts.csv"))
+ysi <- read_csv(here("raw_data/ysi_data.csv"),locale = locale(encoding = "latin1"))
+```
+
+read all ysi
+```{r}
+ysi_location <- list.files(path=here("raw_data/ysi_data"))
+
+ysi <- readr::read_csv(here("raw_data","ysi_data",ysi_location), id = "filename", locale = locale(encoding = "latin1"))
+```
+
+```{r local variables}
+start_date <- mdy("06/27/2022")
+```
+
+
+
+```{r}
+
+ysi %<>% rename('temp_f' = '°F-21A104910', "do_per" = "DO %-21A106679", "do_conc" = "DO mg/L-21A106679",
+                "ph" = "pH-21B101988", "ph_mv" = "pH mV-21B101988", "chlor_rfu" = "Chlorophyll RFU-21B101736",
+                "chlor_conc" = "Chlorophyll ug/L-21B101736")
+
+ysi %<>% mutate(bucket = as.factor(as.numeric(gsub("Tank ", "", Site))))
+
+ysi %<>% mutate(temp_c = (temp_f-32)*(5/9))
+
+ysi$Date <- mdy(ysi$Date)
+```
+
+```{r}
+meta$bucket <- as.factor(meta$bucket)
+counts$bucket <- as.factor(counts$bucket)
+```
+
+
+
+# *Zoop Data*
+
+Data Processing
+```{r, Data Processing}
+data <- left_join(counts, meta, by = "bucket")
+data$community <- as.factor(data$community)
+data$sample_date <- mdy(data$sample_date)
+data %<>% mutate(total = rowSums(across(juvenile_daphnia_uninf:cerio_inf), na.rm = T), 
+                 daphnia = rowSums(across(juvenile_daphnia_uninf:adult_daphnia_inf), na.rm = T),
+                 treatment = paste(community, temp, sep="_"))
+
+data %<>% mutate(cerio = cerio_inf + cerio_uninf, d_ratio = daphnia/total)
+
+data %<>% mutate(daphnia_inc = (juvenile_daphnia_inf+adult_daphnia_inf),
+                 cerio_inc = (cerio_inf),
+                 total_inc = (juvenile_daphnia_inf+adult_daphnia_inf+cerio_inf),
+                 daphnia_prev = (juvenile_daphnia_inf+adult_daphnia_inf)/daphnia,
+                 cerio_prev = (cerio_inf)/cerio,
+                 total_prev = (juvenile_daphnia_inf+adult_daphnia_inf+cerio_inf)/total)
+```
+
+Totals
+```{r}
+ggplot(data,aes(x=sample_date,y=total, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + theme(legend.position = "none") + facet_wrap(vars(community)) 
+
+ggplot(data,aes(x=sample_date,y=daphnia, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() +  facet_wrap(vars(community)) 
+
+ggplot(data,aes(x=sample_date,y=cerio, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_wrap(vars(community)) 
+
+```
+
+```{r}
+ggplot(data,aes(x=sample_date,y=total, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + theme(legend.position = "none") + facet_grid(rows= vars(temp), cols = vars(community)) 
+
+ggplot(data,aes(x=sample_date,y=daphnia, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) 
+
+ggplot(data,aes(x=sample_date,y=cerio, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) 
+
+```
+
+
+Average counts over time
+
+```{r}
+mean_counts <- data %>% mutate(juve = juvenile_daphnia_inf + juvenile_daphnia_uninf,
+                               adult = adult_daphnia_inf + adult_daphnia_uninf,
+                               cerio = cerio_inf + cerio_uninf)
+
+summary <- mean_counts %>% group_by(treatment, sample_date, temp, community) %>% summarize(mean_juve = mean(juve),
+                                                                          juve_var = var(juve),
+                                                                          juve_se = sqrt(var(juve)/length(juve)),
+                                                                          mean_adult = mean(adult),
+                                                                          adult_var = var(adult),
+                                                                          adult_se = sqrt(var(adult)/length(adult)),
+                                                                          mean_cerio = mean(cerio),
+                                                                          cerio_var = var(cerio),
+                                                                          cerio_se = sqrt(var(cerio)/length(cerio)),
+                                                                          mean_daphnia = mean(daphnia),
+                                                                          daphnia_var = var(daphnia),
+                                                                          daphnia_se = sqrt(var(daphnia)/length(daphnia)),
+                                                                          mean_total = mean(total),
+                                                                          total_var = var(total),
+                                                                          total_se = sqrt(var(total)/length(total)))
+```
+
+
+```{r}
+ggplot(summary, aes(x=sample_date,y=mean_total, color = temp)) + 
+  geom_point() + 
+  geom_line(aes(group=treatment)) + 
+  geom_errorbar(aes(ymin = mean_total-total_se, ymax = mean_total+total_se)) +
+  facet_grid(rows = vars(temp), cols = vars(community)) + 
+  labs(title = "Average abundance over time")
+
+ggplot(summary, aes(x=sample_date,y=mean_daphnia, color = temp)) + 
+  geom_point() + 
+  geom_line(aes(group=treatment)) + 
+  geom_errorbar(aes(ymin = mean_daphnia-daphnia_se, ymax = mean_daphnia+daphnia_se)) +
+  facet_grid(rows = vars(temp), cols = vars(community))  + 
+  labs(title = "Average daphnia abundance over time")
+
+ggplot(summary, aes(x=sample_date,y=mean_cerio, color = temp)) + 
+  geom_point() + 
+  geom_line(aes(group=treatment)) + 
+  geom_errorbar(aes(ymin = mean_cerio-cerio_se, ymax = mean_cerio+cerio_se)) +
+  facet_grid(rows = vars(temp), cols = vars(community))  + 
+  labs(title = "Average ceriodaphnia abundance over time")
+```
+
+Daphnia:cerio ratio
+
+```{r}
+data %>% filter(community=="DCM") %>% ggplot(., aes(x=sample_date,y=d_ratio, color = temp)) + geom_point() +geom_line(aes(group = bucket)) + facet_wrap(vars(temp)) + labs(y = "Percent Daphnia")
+```
+
+
+
+Juvenile and Adult Ratio
+```{r}
+size_ratio <- data %>% mutate(j_ratio = (juvenile_daphnia_uninf+juvenile_daphnia_inf)/daphnia)
+```
+
+
+```{r}
+size_ratio %>% filter(community %in% c("D", "DCM", "DM")) %>% ggplot(., aes(x=sample_date, y=j_ratio, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + facet_grid(rows= vars(temp), cols = vars(community)) + labs(y = "Percent juvenile")
+```
+
+```{r}
+size_ratio_summ <- size_ratio %>% group_by(treatment, sample_date) %>% summarize(mean_perc = mean(j_ratio), temp = temp)
+
+#ggplot(size_ratio_summ, aes(x=sample_date, y=j_ratio, color = temp)) + geom_point()
+```
+
+
+
+Daphnia w/ and w/o Metsch
+```{r}
+daphnia <- data %>% filter(community %in% c("D","DM")) 
+```
+
+
+Incidence (i.e. positive case counts)
+should na.rm be set to true? If there is an NA, then that means that at that sample that there were no individuals found (denominator = 0) when measuring incidence
+Is this a significant measurement or not? Should it be counted as true zero or just ommitted?
+```{r}
+mean_inc <- data %>% group_by(treatment, sample_date, temp, community) %>% 
+  summarize(mean_inc = mean(total_inc),
+  inc_se = sqrt(var(total_inc)/length(total_inc)),
+  mean_daph_inc = mean(daphnia_inc),
+  daph_inc_se = sqrt(var(daphnia_inc)/length(daphnia_inc)),
+  mean_cer_inc = mean(cerio_inc),
+  cer_inc_se = sqrt(var(cerio_inc)/length(cerio_inc)))
+
+mean_inc <- data %>% group_by(treatment, sample_date, temp, community) %>% 
+  summarize(mean_inc = mean(total_inc, na.rm = T),
+  inc_se = sqrt(var(total_inc, na.rm = T)/length(total_inc)),
+  mean_daph_inc = mean(daphnia_inc, na.rm = T),
+  daph_inc_se = sqrt(var(daphnia_inc, na.rm = T)/length(daphnia_inc)),
+  mean_cer_inc = mean(cerio_inc, na.rm = T),
+  cer_inc_se = sqrt(var(cerio_inc, na.rm = T)/length(cerio_inc)))
+```
+
+```{r}
+mean_inc %>% ggplot(.,aes(x=sample_date, y=mean_inc, color = temp)) + geom_point() + 
+  geom_line(aes(group=treatment)) + 
+  geom_errorbar(aes(ymin = mean_inc-inc_se, ymax = mean_inc+inc_se)) +
+  facet_grid(rows = vars(temp), cols = vars(community)) + labs(title="Total (Daphnia + Cerio) Incidence over Time")
+
+mean_inc %>% ggplot(.,aes(x=sample_date, y=mean_daph_inc, color = temp)) + geom_point() + 
+  geom_line(aes(group=treatment)) + 
+  geom_errorbar(aes(ymin = mean_daph_inc-daph_inc_se, ymax = mean_daph_inc+daph_inc_se)) +
+  facet_grid(rows = vars(temp), cols = vars(community))  + labs(title="Daphnia Incidence over Time")
+
+mean_inc %>% ggplot(.,aes(x=sample_date, y=mean_cer_inc, color = temp)) + geom_point() + 
+  geom_line(aes(group=treatment)) + 
+  geom_errorbar(aes(ymin = mean_cer_inc-cer_inc_se, ymax = mean_cer_inc+cer_inc_se)) +
+  facet_grid(rows = vars(temp), cols = vars(community))  + labs(title="Cerio Incidence over Time")
+```
+
+
+
+
+
+# *YSI DATA*
+
+ysi
+```{r}
+ysi_summ <- ysi %>% group_by(bucket, Date) %>% summarize(temp_f = mean(temp_f),
+                                                         temp_c = mean(temp_c),
+                                                         do_per = mean(do_per),
+                                                         do_conc = mean(do_conc),
+                                                         ph = mean(ph),
+                                                         ph_mv = mean(ph_mv),
+                                                         chlor_rfu = mean(chlor_rfu),
+                                                         chlor_conc = mean(chlor_conc))
+
+ysi_summ %<>% left_join(.,meta, by = "bucket")
+```
+
+
+temp
+```{r}
+# ggplot(ysi_summ, aes(x=Date, y=temp_c, color = bucket)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + theme(legend.position = "none")
+
+ggplot(ysi_summ, aes(x=Date, y=temp_c, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+```
+
+```{r}
+ysi_summ %>% filter(pool == 7) %>% ggplot(., aes(x=Date, y=temp_c, color = bucket)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + theme(legend.position = "none")
+```
+
+do_per
+```{r}
+# ggplot(ysi_summ, aes(x=Date, y=do_per, color = community)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_wrap(vars(temp))
+# 
+# ggplot(ysi_summ, aes(x=Date, y=do_per, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_wrap(vars(community))
+
+ggplot(ysi_summ, aes(x=Date, y=do_per, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+```
+
+ph
+```{r}
+# ggplot(ysi_summ, aes(x=Date, y=ph, color = community)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_wrap(vars(temp))
+# 
+# ggplot(ysi_summ, aes(x=Date, y=ph, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_wrap(vars(community))
+
+ggplot(ysi_summ, aes(x=Date, y=ph, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+```
+
+chlor_conc
+```{r}
+# ggplot(ysi_summ, aes(x=Date, y=chlor_conc, color = community)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() +  facet_wrap(vars(temp))
+# 
+# ggplot(ysi_summ, aes(x=Date, y=chlor_conc, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() +  facet_wrap(vars(community))
+
+ggplot(ysi_summ, aes(x=Date, y=chlor_conc, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+```
+according to temp
+```{r}
+ggplot(ysi_summ, aes(x=Date, y=temp_c, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+
+
+ggplot(ysi_summ, aes(x=Date, y=do_per, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+
+ggplot(ysi_summ, aes(x=Date, y=ph_mv, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+
+ggplot(ysi_summ, aes(x=Date, y=ph, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+
+ggplot(ysi_summ, aes(x=Date, y=chlor_conc, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+
+ggplot(ysi_summ, aes(x=Date, y=chlor_rfu, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(temp), cols = vars(community))
+```
+
+according to pool
+```{r}
+
+ggplot(ysi_summ, aes(x=Date, y=temp_c, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(pool), cols = vars(community))
+
+
+ggplot(ysi_summ, aes(x=Date, y=do_per, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(pool), cols = vars(community))
+
+ggplot(ysi_summ, aes(x=Date, y=ph, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(pool), cols = vars(community))
+
+
+ggplot(ysi_summ, aes(x=Date, y=chlor_conc, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + scale_color_discrete() + facet_grid(rows=vars(pool), cols = vars(community))
+
+```
+
+
+
+# Metsch Infections in Daphnia across Temp
+
+```{r}
+summary %>% filter(community %in% c("D","DM")) %>% ggplot(., aes(x=sample_date,y=mean_daphnia, color = temp)) + 
+  geom_point() + 
+  geom_line(aes(group=treatment)) + 
+  geom_errorbar(aes(ymin = mean_daphnia-daphnia_se, ymax = mean_daphnia+daphnia_se)) +
+  facet_grid(rows = vars(temp), cols = vars(community)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) + 
+  labs(title = "Average Daphnia abundance over time")
+
+summary %>% filter(community %in% c("D","DM")) %>% ggplot(., aes(x=sample_date,y=mean_daphnia, color = temp)) + 
+  geom_point() + 
+  geom_line(aes(group=treatment)) + 
+  geom_errorbar(aes(ymin = mean_daphnia-daphnia_se, ymax = mean_daphnia+daphnia_se)) +
+  facet_grid(rows = vars(community), cols = vars(temp)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) + 
+  labs(title = "Average Daphnia abundance over time")
+
+```
+
+```{r}
+mean_inc %>% filter(community %in% c("DM")) %>% ggplot(.,aes(x=sample_date, y=mean_inc, color = temp)) + geom_point() + 
+  geom_line(aes(group=treatment)) + 
+  geom_errorbar(aes(ymin = mean_inc-inc_se, ymax = mean_inc+inc_se)) +
+  facet_grid(rows = vars(temp), cols = vars(community)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1))
+
+```
+
+Let's look at Infection Prevalence in Daphnia over temperatures for daphnia and ceriodaphnia treatments
+
+```{r}
+prev_summary <- data %>% 
+  group_by(treatment, sample_date, temp, community) %>%
+  summarize(n = n(),
+            daph_prev = mean(daphnia_prev),
+            cerio_prev = mean(cerio_prev),
+            total_prev = mean(total_prev))
+```
+
+```{r}
+prev_summary %>% filter(community %in% c("CM", "DCM", "DM")) %>% ggplot(.,aes(x=sample_date, y=daph_prev, color = temp)) + geom_point() + 
+  geom_line(aes(group=treatment)) + 
+  facet_grid(rows = vars(temp), cols = vars(community)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) + labs(title = "Daphnia prevalence over time")
+
+
+prev_summary %>% filter(community %in% c("CM", "DCM", "DM")) %>% ggplot(.,aes(x=sample_date, y=daph_prev, color = temp)) + geom_point() + 
+  geom_line(aes(group=treatment)) + 
+  facet_grid(cols = vars(temp), rows = vars(community)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) + labs(title = "Daphnia prevalence over time")
+
+
+prev_summary %>% filter(community %in% c("CM", "DCM", "DM")) %>% ggplot(.,aes(x=sample_date, y=cerio_prev, color = temp)) + geom_point() + 
+  geom_line(aes(group=treatment)) + 
+  facet_grid(rows = vars(temp), cols = vars(community)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) + labs(title = "Cerioaphnia prevalence over time")
+
+
+prev_summary %>% filter(community %in% c("CM", "DCM", "DM")) %>% ggplot(.,aes(x=sample_date, y=total_prev, color = temp)) + geom_point() + 
+  geom_line(aes(group=treatment)) + 
+  facet_grid(rows = vars(temp), cols = vars(community)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) + labs(title = "Daphnia+Cerio prevalence over time")
+```
+
+In terms of prevalence, daphnia had larger epidemics in the presence of ceriodaphnia rather than not but there weren't that many ceriodaphnia anyways. We need to look at what the treaments actually ended up being since we can't really trust how we set them up to be. One interesting thing is that the timing of epidemics for daphnia only treaments seemed to always be earlier than daphnia+cerio treatments. 
+
+
+Epidemiological characteristics to look at
+ - Maximum prevalence
+ - severity (sign and size of standardized regression coefficients)
+ - timing of start and peak prevalence
+ - integral of infection prevalence
+
+```{r}
+prev_summary %<>% mutate(time = as.numeric(sample_date-start_date))
+
+prev_auc <- prev_summary %>% group_by(treatment) %>% summarize(daph_auc = trapz(x = time, y = daph_prev),
+                                                   cerio_auc = trapz(x = time, y = cerio_prev),
+                                                   total_auc = trapz(x = time, y = total_prev))
+```
+
+
