@@ -5,24 +5,19 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
 ---
 
-packages
-```{r, message = F}
-library(tidyverse)
-library(magrittr)
+```{r source, message = F}
 library(here)
-library(ggnewscale)
-library(lubridate)
-library(epitools)
-library(pracma)
+source(here("base","src.R"))
 ```
+
 
 read data
 ```{r read data, message = F}
-readRDS(here("data", "processed_data", "abundance.rds"))
-readRDS(here("data", "processed_data", "infections.rds"))
-readRDS(here("data", "processed_data", "summ_abund.rds"))
-readRDS(here("data", "processed_data", "summ_inf.rds"))
-readRDS(here("data", "processed_data", "summ_ysi.rds"))
+abundance <- readRDS(here("data", "processed_data", "abundance.rds"))
+infections <- readRDS(here("data", "processed_data", "infections.rds"))
+summ_abund <- readRDS(here("data", "processed_data", "summ_abund.rds"))
+summ_inf <- readRDS(here("data", "processed_data", "summ_inf.rds"))
+ysi_summ <- readRDS(here("data", "processed_data", "summ_ysi.rds"))
 ```
 
 
@@ -31,12 +26,19 @@ readRDS(here("data", "processed_data", "summ_ysi.rds"))
 # *Zoop Data*
 
 Totals
-```{r}
-ggplot(data,aes(x=sample_date,y=total, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + theme(legend.position = "none") + facet_wrap(vars(community)) 
+```{r raw abundance}
+raw_abund_plot <- function(data, host){
+ggplot(data,aes(x=sample_date,y=host, color=temp)) + 
+  geom_point() + 
+  geom_line(aes(group = bucket)) + 
+  scale_color_discrete() + 
+  theme(legend.position = "none") + 
+  facet_wrap(vars(community))
+}
 
-ggplot(data,aes(x=sample_date,y=daphnia, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() +  facet_wrap(vars(community)) 
-
-ggplot(data,aes(x=sample_date,y=cerio, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_wrap(vars(community)) 
+raw_abund_plot(data = data, host = data$total)
+raw_abund_plot(data = data, host = data$daphnia)
+raw_abund_plot(data = data, host = data$cerio)
 
 ```
 
