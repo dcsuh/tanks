@@ -14,8 +14,6 @@ ysi <- readr::read_csv(here("data","raw_data","ysi_data",ysi_location), id = "fi
 #write ysi as singular csv
 #write.csv(ysi, file = here("data/raw_data/ysi.csv"))
 
-#declare object for experiment start date
-start_date <- mdy("06/27/2022")
 
 #fix up names for ysi data
 ysi %<>% rename('temp_f' = '°F-21A104910', "do_per" = "DO %-21A106679", "do_conc" = "DO mg/L-21A106679",

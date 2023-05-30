@@ -40,3 +40,5 @@ unit <- "in"
 
 #Some useful objects
 const_temp <- c("15", "20", "25")
+start_date <- mdy("06/27/2022")
+
