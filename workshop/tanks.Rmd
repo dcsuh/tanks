@@ -17,65 +17,18 @@ library(pracma)
 ```
 
 read data
-```{r, message = F}
-meta <- read_csv(here("raw_data/tank_metadata.csv"))
-counts <- read_csv(here("raw_data/tank_counts.csv"))
-ysi <- read_csv(here("raw_data/ysi_data.csv"),locale = locale(encoding = "latin1"))
+```{r read data, message = F}
+readRDS(here("data", "processed_data", "abundance.rds"))
+readRDS(here("data", "processed_data", "infections.rds"))
+readRDS(here("data", "processed_data", "summ_abund.rds"))
+readRDS(here("data", "processed_data", "summ_inf.rds"))
+readRDS(here("data", "processed_data", "summ_ysi.rds"))
 ```
 
-read all ysi
-```{r}
-ysi_location <- list.files(path=here("raw_data/ysi_data"))
-
-ysi <- readr::read_csv(here("raw_data","ysi_data",ysi_location), id = "filename", locale = locale(encoding = "latin1"))
-```
-
-```{r local variables}
-start_date <- mdy("06/27/2022")
-```
-
-
-
-```{r}
-
-ysi %<>% rename('temp_f' = '°F-21A104910', "do_per" = "DO %-21A106679", "do_conc" = "DO mg/L-21A106679",
-                "ph" = "pH-21B101988", "ph_mv" = "pH mV-21B101988", "chlor_rfu" = "Chlorophyll RFU-21B101736",
-                "chlor_conc" = "Chlorophyll ug/L-21B101736")
-
-ysi %<>% mutate(bucket = as.factor(as.numeric(gsub("Tank ", "", Site))))
-
-ysi %<>% mutate(temp_c = (temp_f-32)*(5/9))
-
-ysi$Date <- mdy(ysi$Date)
-```
-
-```{r}
-meta$bucket <- as.factor(meta$bucket)
-counts$bucket <- as.factor(counts$bucket)
-```
 
 
 
 # *Zoop Data*
-
-Data Processing
-```{r, Data Processing}
-data <- left_join(counts, meta, by = "bucket")
-data$community <- as.factor(data$community)
-data$sample_date <- mdy(data$sample_date)
-data %<>% mutate(total = rowSums(across(juvenile_daphnia_uninf:cerio_inf), na.rm = T), 
-                 daphnia = rowSums(across(juvenile_daphnia_uninf:adult_daphnia_inf), na.rm = T),
-                 treatment = paste(community, temp, sep="_"))
-
-data %<>% mutate(cerio = cerio_inf + cerio_uninf, d_ratio = daphnia/total)
-
-data %<>% mutate(daphnia_inc = (juvenile_daphnia_inf+adult_daphnia_inf),
-                 cerio_inc = (cerio_inf),
-                 total_inc = (juvenile_daphnia_inf+adult_daphnia_inf+cerio_inf),
-                 daphnia_prev = (juvenile_daphnia_inf+adult_daphnia_inf)/daphnia,
-                 cerio_prev = (cerio_inf)/cerio,
-                 total_prev = (juvenile_daphnia_inf+adult_daphnia_inf+cerio_inf)/total)
-```
 
 Totals
 ```{r}
@@ -97,29 +50,6 @@ ggplot(data,aes(x=sample_date,y=cerio, color=temp))+ geom_point() + geom_line(ae
 ```
 
 
-Average counts over time
-
-```{r}
-mean_counts <- data %>% mutate(juve = juvenile_daphnia_inf + juvenile_daphnia_uninf,
-                               adult = adult_daphnia_inf + adult_daphnia_uninf,
-                               cerio = cerio_inf + cerio_uninf)
-
-summary <- mean_counts %>% group_by(treatment, sample_date, temp, community) %>% summarize(mean_juve = mean(juve),
-                                                                          juve_var = var(juve),
-                                                                          juve_se = sqrt(var(juve)/length(juve)),
-                                                                          mean_adult = mean(adult),
-                                                                          adult_var = var(adult),
-                                                                          adult_se = sqrt(var(adult)/length(adult)),
-                                                                          mean_cerio = mean(cerio),
-                                                                          cerio_var = var(cerio),
-                                                                          cerio_se = sqrt(var(cerio)/length(cerio)),
-                                                                          mean_daphnia = mean(daphnia),
-                                                                          daphnia_var = var(daphnia),
-                                                                          daphnia_se = sqrt(var(daphnia)/length(daphnia)),
-                                                                          mean_total = mean(total),
-                                                                          total_var = var(total),
-                                                                          total_se = sqrt(var(total)/length(total)))
-```
 
 
 ```{r}
@@ -145,18 +75,6 @@ ggplot(summary, aes(x=sample_date,y=mean_cerio, color = temp)) +
   labs(title = "Average ceriodaphnia abundance over time")
 ```
 
-Daphnia:cerio ratio
-
-```{r}
-data %>% filter(community=="DCM") %>% ggplot(., aes(x=sample_date,y=d_ratio, color = temp)) + geom_point() +geom_line(aes(group = bucket)) + facet_wrap(vars(temp)) + labs(y = "Percent Daphnia")
-```
-
-
-
-Juvenile and Adult Ratio
-```{r}
-size_ratio <- data %>% mutate(j_ratio = (juvenile_daphnia_uninf+juvenile_daphnia_inf)/daphnia)
-```
 
 
 ```{r}
@@ -171,32 +89,13 @@ size_ratio_summ <- size_ratio %>% group_by(treatment, sample_date) %>% summarize
 
 
 
-Daphnia w/ and w/o Metsch
-```{r}
-daphnia <- data %>% filter(community %in% c("D","DM")) 
-```
-
 
 Incidence (i.e. positive case counts)
 should na.rm be set to true? If there is an NA, then that means that at that sample that there were no individuals found (denominator = 0) when measuring incidence
 Is this a significant measurement or not? Should it be counted as true zero or just ommitted?
-```{r}
-mean_inc <- data %>% group_by(treatment, sample_date, temp, community) %>% 
-  summarize(mean_inc = mean(total_inc),
-  inc_se = sqrt(var(total_inc)/length(total_inc)),
-  mean_daph_inc = mean(daphnia_inc),
-  daph_inc_se = sqrt(var(daphnia_inc)/length(daphnia_inc)),
-  mean_cer_inc = mean(cerio_inc),
-  cer_inc_se = sqrt(var(cerio_inc)/length(cerio_inc)))
 
-mean_inc <- data %>% group_by(treatment, sample_date, temp, community) %>% 
-  summarize(mean_inc = mean(total_inc, na.rm = T),
-  inc_se = sqrt(var(total_inc, na.rm = T)/length(total_inc)),
-  mean_daph_inc = mean(daphnia_inc, na.rm = T),
-  daph_inc_se = sqrt(var(daphnia_inc, na.rm = T)/length(daphnia_inc)),
-  mean_cer_inc = mean(cerio_inc, na.rm = T),
-  cer_inc_se = sqrt(var(cerio_inc, na.rm = T)/length(cerio_inc)))
-```
+
+
 
 ```{r}
 mean_inc %>% ggplot(.,aes(x=sample_date, y=mean_inc, color = temp)) + geom_point() + 
@@ -222,18 +121,7 @@ mean_inc %>% ggplot(.,aes(x=sample_date, y=mean_cer_inc, color = temp)) + geom_p
 # *YSI DATA*
 
 ysi
-```{r}
-ysi_summ <- ysi %>% group_by(bucket, Date) %>% summarize(temp_f = mean(temp_f),
-                                                         temp_c = mean(temp_c),
-                                                         do_per = mean(do_per),
-                                                         do_conc = mean(do_conc),
-                                                         ph = mean(ph),
-                                                         ph_mv = mean(ph_mv),
-                                                         chlor_rfu = mean(chlor_rfu),
-                                                         chlor_conc = mean(chlor_conc))
 
-ysi_summ %<>% left_join(.,meta, by = "bucket")
-```
 
 
 temp
