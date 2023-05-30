@@ -28,48 +28,39 @@ ysi_summ <- readRDS(here("data", "processed_data", "summ_ysi.rds"))
 Totals
 ```{r raw abundance}
 raw_abund_plot <- function(data, host){
-ggplot(data,aes(x=sample_date,y=host, color=temp)) + 
+ggplot(data,aes(x=sample_date,y=host, color=temp))+ 
   geom_point() + 
   geom_line(aes(group = bucket)) + 
   scale_color_discrete() + 
   theme(legend.position = "none") + 
-  facet_wrap(vars(community))
+  facet_grid(rows= vars(temp), cols = vars(community)) 
 }
 
-raw_abund_plot(data = data, host = data$total)
-raw_abund_plot(data = data, host = data$daphnia)
-raw_abund_plot(data = data, host = data$cerio)
-
-```
-
-```{r}
-ggplot(data,aes(x=sample_date,y=total, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + theme(legend.position = "none") + facet_grid(rows= vars(temp), cols = vars(community)) 
-
-ggplot(data,aes(x=sample_date,y=daphnia, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) 
-
-ggplot(data,aes(x=sample_date,y=cerio, color=temp))+ geom_point() + geom_line(aes(group = bucket)) + scale_color_discrete() + facet_grid(rows= vars(temp), cols = vars(community)) 
+raw_abund_plot(data = abundance, host = abundance$total)
+raw_abund_plot(data = abundance, host = abundance$daphnia)
+raw_abund_plot(data = abundance, host = abundance$cerio)
 
 ```
 
 
 
 
-```{r}
-ggplot(summary, aes(x=sample_date,y=mean_total, color = temp)) + 
+```{r mean abundance}
+ggplot(summ_abund, aes(x=sample_date,y=mean_total, color = temp)) + 
   geom_point() + 
   geom_line(aes(group=treatment)) + 
   geom_errorbar(aes(ymin = mean_total-total_se, ymax = mean_total+total_se)) +
   facet_grid(rows = vars(temp), cols = vars(community)) + 
   labs(title = "Average abundance over time")
 
-ggplot(summary, aes(x=sample_date,y=mean_daphnia, color = temp)) + 
+ggplot(summ_abund, aes(x=sample_date,y=mean_daphnia, color = temp)) + 
   geom_point() + 
   geom_line(aes(group=treatment)) + 
   geom_errorbar(aes(ymin = mean_daphnia-daphnia_se, ymax = mean_daphnia+daphnia_se)) +
   facet_grid(rows = vars(temp), cols = vars(community))  + 
   labs(title = "Average daphnia abundance over time")
 
-ggplot(summary, aes(x=sample_date,y=mean_cerio, color = temp)) + 
+ggplot(summ_abund, aes(x=sample_date,y=mean_cerio, color = temp)) + 
   geom_point() + 
   geom_line(aes(group=treatment)) + 
   geom_errorbar(aes(ymin = mean_cerio-cerio_se, ymax = mean_cerio+cerio_se)) +
@@ -79,14 +70,8 @@ ggplot(summary, aes(x=sample_date,y=mean_cerio, color = temp)) +
 
 
 
-```{r}
-size_ratio %>% filter(community %in% c("D", "DCM", "DM")) %>% ggplot(., aes(x=sample_date, y=j_ratio, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + facet_grid(rows= vars(temp), cols = vars(community)) + labs(y = "Percent juvenile")
-```
-
-```{r}
-size_ratio_summ <- size_ratio %>% group_by(treatment, sample_date) %>% summarize(mean_perc = mean(j_ratio), temp = temp)
-
-#ggplot(size_ratio_summ, aes(x=sample_date, y=j_ratio, color = temp)) + geom_point()
+```{r size ratio}
+abundance %>% filter(community %in% c("D", "DCM", "DM")) %>% ggplot(., aes(x=sample_date, y=juve_ratio, color = temp)) + geom_point() + geom_line(aes(group=bucket)) + facet_grid(rows= vars(temp), cols = vars(community)) + labs(y = "Percent juvenile")
 ```
 
 
@@ -100,17 +85,17 @@ Is this a significant measurement or not? Should it be counted as true zero or j
 
 
 ```{r}
-mean_inc %>% ggplot(.,aes(x=sample_date, y=mean_inc, color = temp)) + geom_point() + 
+summ_inf %>% ggplot(.,aes(x=sample_date, y=mean_inc, color = temp)) + geom_point() + 
   geom_line(aes(group=treatment)) + 
   geom_errorbar(aes(ymin = mean_inc-inc_se, ymax = mean_inc+inc_se)) +
   facet_grid(rows = vars(temp), cols = vars(community)) + labs(title="Total (Daphnia + Cerio) Incidence over Time")
 
-mean_inc %>% ggplot(.,aes(x=sample_date, y=mean_daph_inc, color = temp)) + geom_point() + 
+summ_inf %>% ggplot(.,aes(x=sample_date, y=mean_daph_inc, color = temp)) + geom_point() + 
   geom_line(aes(group=treatment)) + 
   geom_errorbar(aes(ymin = mean_daph_inc-daph_inc_se, ymax = mean_daph_inc+daph_inc_se)) +
   facet_grid(rows = vars(temp), cols = vars(community))  + labs(title="Daphnia Incidence over Time")
 
-mean_inc %>% ggplot(.,aes(x=sample_date, y=mean_cer_inc, color = temp)) + geom_point() + 
+summ_inf %>% ggplot(.,aes(x=sample_date, y=mean_cer_inc, color = temp)) + geom_point() + 
   geom_line(aes(group=treatment)) + 
   geom_errorbar(aes(ymin = mean_cer_inc-cer_inc_se, ymax = mean_cer_inc+cer_inc_se)) +
   facet_grid(rows = vars(temp), cols = vars(community))  + labs(title="Cerio Incidence over Time")
@@ -199,7 +184,7 @@ ggplot(ysi_summ, aes(x=Date, y=chlor_conc, color = temp)) + geom_point() + geom_
 # Metsch Infections in Daphnia across Temp
 
 ```{r}
-summary %>% filter(community %in% c("D","DM")) %>% ggplot(., aes(x=sample_date,y=mean_daphnia, color = temp)) + 
+summ_abund %>% filter(community %in% c("D","DM")) %>% ggplot(., aes(x=sample_date,y=mean_daphnia, color = temp)) + 
   geom_point() + 
   geom_line(aes(group=treatment)) + 
   geom_errorbar(aes(ymin = mean_daphnia-daphnia_se, ymax = mean_daphnia+daphnia_se)) +
@@ -207,7 +192,7 @@ summary %>% filter(community %in% c("D","DM")) %>% ggplot(., aes(x=sample_date,y
   theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) + 
   labs(title = "Average Daphnia abundance over time")
 
-summary %>% filter(community %in% c("D","DM")) %>% ggplot(., aes(x=sample_date,y=mean_daphnia, color = temp)) + 
+summ_abund %>% filter(community %in% c("D","DM")) %>% ggplot(., aes(x=sample_date,y=mean_daphnia, color = temp)) + 
   geom_point() + 
   geom_line(aes(group=treatment)) + 
   geom_errorbar(aes(ymin = mean_daphnia-daphnia_se, ymax = mean_daphnia+daphnia_se)) +
@@ -218,7 +203,7 @@ summary %>% filter(community %in% c("D","DM")) %>% ggplot(., aes(x=sample_date,y
 ```
 
 ```{r}
-mean_inc %>% filter(community %in% c("DM")) %>% ggplot(.,aes(x=sample_date, y=mean_inc, color = temp)) + geom_point() + 
+summ_inf %>% filter(community %in% c("DM")) %>% ggplot(.,aes(x=sample_date, y=mean_inc, color = temp)) + geom_point() + 
   geom_line(aes(group=treatment)) + 
   geom_errorbar(aes(ymin = mean_inc-inc_se, ymax = mean_inc+inc_se)) +
   facet_grid(rows = vars(temp), cols = vars(community)) +
@@ -228,35 +213,25 @@ mean_inc %>% filter(community %in% c("DM")) %>% ggplot(.,aes(x=sample_date, y=me
 
 Let's look at Infection Prevalence in Daphnia over temperatures for daphnia and ceriodaphnia treatments
 
-```{r}
-prev_summary <- data %>% 
-  group_by(treatment, sample_date, temp, community) %>%
-  summarize(n = n(),
-            daph_prev = mean(daphnia_prev),
-            cerio_prev = mean(cerio_prev),
-            total_prev = mean(total_prev))
-```
+
 
 ```{r}
-prev_summary %>% filter(community %in% c("CM", "DCM", "DM")) %>% ggplot(.,aes(x=sample_date, y=daph_prev, color = temp)) + geom_point() + 
+summ_inf %>% filter(community %in% c("CM", "DCM", "DM")) %>% ggplot(.,aes(x=sample_date, y=daph_prev, color = temp)) + geom_point() + 
   geom_line(aes(group=treatment)) + 
   facet_grid(rows = vars(temp), cols = vars(community)) +
   theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) + labs(title = "Daphnia prevalence over time")
 
-
-prev_summary %>% filter(community %in% c("CM", "DCM", "DM")) %>% ggplot(.,aes(x=sample_date, y=daph_prev, color = temp)) + geom_point() + 
+summ_inf %>% filter(community %in% c("CM", "DCM", "DM")) %>% ggplot(.,aes(x=sample_date, y=daph_prev, color = temp)) + geom_point() + 
   geom_line(aes(group=treatment)) + 
   facet_grid(cols = vars(temp), rows = vars(community)) +
   theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) + labs(title = "Daphnia prevalence over time")
 
-
-prev_summary %>% filter(community %in% c("CM", "DCM", "DM")) %>% ggplot(.,aes(x=sample_date, y=cerio_prev, color = temp)) + geom_point() + 
+summ_inf %>% filter(community %in% c("CM", "DCM", "DM")) %>% ggplot(.,aes(x=sample_date, y=cerio_prev, color = temp)) + geom_point() + 
   geom_line(aes(group=treatment)) + 
   facet_grid(rows = vars(temp), cols = vars(community)) +
   theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) + labs(title = "Cerioaphnia prevalence over time")
 
-
-prev_summary %>% filter(community %in% c("CM", "DCM", "DM")) %>% ggplot(.,aes(x=sample_date, y=total_prev, color = temp)) + geom_point() + 
+summ_inf %>% filter(community %in% c("CM", "DCM", "DM")) %>% ggplot(.,aes(x=sample_date, y=total_prev, color = temp)) + geom_point() + 
   geom_line(aes(group=treatment)) + 
   facet_grid(rows = vars(temp), cols = vars(community)) +
   theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) + labs(title = "Daphnia+Cerio prevalence over time")
@@ -272,11 +247,10 @@ Epidemiological characteristics to look at
  - integral of infection prevalence
 
 ```{r}
-prev_summary %<>% mutate(time = as.numeric(sample_date-start_date))
-
-prev_auc <- prev_summary %>% group_by(treatment) %>% summarize(daph_auc = trapz(x = time, y = daph_prev),
-                                                   cerio_auc = trapz(x = time, y = cerio_prev),
-                                                   total_auc = trapz(x = time, y = total_prev))
+summ_inf %<>% mutate(days = as.numeric(sample_date-start_date))
+prev_auc <- summ_inf %>% group_by(treatment) %>% summarize(daph_auc = trapz(x = days, y = daph_prev),
+                                                   cerio_auc = trapz(x = days, y = cerio_prev),
+                                                   total_auc = trapz(x = days, y = total_prev))
 ```
 
 

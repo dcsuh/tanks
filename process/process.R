@@ -48,7 +48,8 @@ abundance <- data %>% mutate(total = rowSums(across(juvenile_daphnia_uninf:cerio
                              daph_ratio = daphnia/total,
                              adult_ratio = adult/daphnia,
                              juve_ratio = juve/daphnia,
-                             treatment = paste(community, temp, sep="_"))
+                             treatment = paste(community, temp, sep="_"),
+                             days = as.numeric(sample_date-start_date))
 
 summ_abund <- abundance %>% group_by(treatment, sample_date, temp, community) %>% summarize(mean_juve = mean(juve),
                                                                                             juve_var = var(juve),
